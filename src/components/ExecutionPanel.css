@@ -1,0 +1,225 @@
+.ep-root {
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-top: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Animations ── */
+@keyframes ep-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes ep-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+/* ── Header ── */
+.ep-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .1s;
+  flex-shrink: 0;
+}
+.ep-header:hover { background: var(--bg-hover); }
+
+.ep-header-left  { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.ep-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.ep-header-icon      { font-size: 11px; color: var(--accent); }
+.ep-header-icon-spin { display: inline-block; animation: ep-spin 1.4s linear infinite; color: var(--accent); }
+.ep-header-title     { font-size: 12px; font-weight: 700; color: var(--text-secondary); flex-shrink: 0; }
+
+/* ── Badges ── */
+.ep-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+}
+.ep-badge-running { background: rgba(227,6,19,.12);  color: var(--accent);  border: 1px solid rgba(227,6,19,.25); }
+.ep-badge-queue   { background: rgba(224,138,0,.12);  color: var(--yellow);  border: 1px solid rgba(224,138,0,.25); }
+.ep-badge-done    { background: rgba(42,157,92,.12);  color: var(--green);   border: 1px solid rgba(42,157,92,.25); }
+.ep-badge-failed  { background: rgba(227,6,19,.15);   color: var(--red);     border: 1px solid rgba(227,6,19,.3); }
+.ep-badge-stopped { background: rgba(0,0,0,.06);      color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ── Buttons ── */
+.ep-stop-all-btn {
+  font-size: 11px; padding: 3px 10px; border-radius: 6px;
+  background: rgba(227,6,19,.1); color: var(--red);
+  border: 1px solid rgba(227,6,19,.25); transition: background .12s;
+}
+.ep-stop-all-btn:hover { background: rgba(227,6,19,.22); }
+
+.ep-clear-btn {
+  font-size: 11px; padding: 3px 10px; border-radius: 6px;
+  background: var(--bg-surface); color: var(--text-muted);
+  border: 1px solid var(--border); transition: background .12s, color .12s;
+}
+.ep-clear-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.ep-toggle { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
+
+/* ── Body ── */
+.ep-body {
+  display: none;
+  flex-direction: column;
+  height: 300px;
+  border-top: 1px solid var(--border);
+}
+.ep-expanded .ep-body { display: flex; }
+
+/* ── Tab bar ── */
+.ep-tabbar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.ep-tabbar::-webkit-scrollbar { height: 3px; }
+.ep-tabbar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Tab base ── */
+.ep-tab {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 9px; border-radius: 7px;
+  border: 1px solid transparent;
+  cursor: pointer; white-space: nowrap;
+  font-size: 11px; font-weight: 500;
+  transition: background .12s, border-color .12s;
+  flex-shrink: 0;
+}
+
+/* ── Running tab — highlighted, animated ── */
+.ep-tab-running {
+  background: rgba(227,6,19,.08);
+  border-color: rgba(227,6,19,.3);
+  color: var(--accent);
+}
+.ep-tab-running:hover { background: rgba(227,6,19,.14); }
+.ep-tab-running.ep-tab-active {
+  background: rgba(227,6,19,.14) !important;
+  border-color: var(--accent) !important;
+}
+
+/* ── Done tab — green ── */
+.ep-tab-done {
+  background: rgba(42,157,92,.07);
+  border-color: rgba(42,157,92,.25);
+  color: var(--green);
+}
+.ep-tab-done:hover { background: rgba(42,157,92,.13); }
+.ep-tab-done.ep-tab-active {
+  background: rgba(42,157,92,.13) !important;
+  border-color: var(--green) !important;
+}
+
+/* ── Failed tab — red ── */
+.ep-tab-failed {
+  background: rgba(227,6,19,.1);
+  border-color: rgba(227,6,19,.35);
+  color: var(--red);
+}
+.ep-tab-failed:hover { background: rgba(227,6,19,.18); }
+.ep-tab-failed.ep-tab-active {
+  background: rgba(227,6,19,.18) !important;
+  border-color: var(--red) !important;
+}
+
+/* ── Stopped tab — grey ── */
+.ep-tab-stopped {
+  background: rgba(0,0,0,.04);
+  border-color: var(--border);
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.ep-tab-stopped:hover { opacity: 1; background: var(--bg-hover); }
+.ep-tab-stopped.ep-tab-active {
+  background: var(--bg-surface) !important;
+  border-color: var(--text-muted) !important;
+  opacity: 1;
+  color: var(--text-secondary) !important;
+}
+
+/* ── Queued tab — dimmed, dashed border ── */
+.ep-tab-queued {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+.ep-tab-queued-item { pointer-events: none; }
+
+/* ── Status icons ── */
+.ep-status-spin  {
+  font-size: 12px; flex-shrink: 0;
+  display: inline-block;
+  animation: ep-spin 1.2s linear infinite;
+  color: var(--accent);
+}
+.ep-status-ok    { font-size: 11px; font-weight: 700; flex-shrink: 0; color: var(--green); }
+.ep-status-fail  { font-size: 11px; font-weight: 700; flex-shrink: 0; color: var(--red); }
+.ep-status-stop  { font-size: 9px;  flex-shrink: 0; color: var(--text-muted); }
+.ep-status-queue {
+  font-size: 12px; flex-shrink: 0; color: var(--yellow);
+  animation: ep-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Tab contents ── */
+.ep-tab-label { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.ep-tab-dur   { font-size: 10px; opacity: 0.7; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.ep-tab-count { font-size: 10px; opacity: 0.6; flex-shrink: 0; }
+
+.ep-tab-stop {
+  background: transparent; border: none; padding: 1px 3px;
+  font-size: 9px; color: var(--red); opacity: 0.8;
+  cursor: pointer; line-height: 1;
+  transition: opacity .1s;
+  border-radius: 3px;
+}
+.ep-tab-stop:hover { opacity: 1; background: rgba(227,6,19,.15); }
+
+.ep-tab-close {
+  background: transparent; border: none; padding: 1px 3px;
+  font-size: 13px; color: var(--text-muted);
+  cursor: pointer; line-height: 1;
+  transition: color .1s, background .1s;
+  border-radius: 3px;
+}
+.ep-tab-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* ── Log area ── */
+.ep-log {
+  flex: 1;
+  overflow-y: auto;
+  background: #111318;
+  padding: 10px 14px;
+}
+.ep-log::-webkit-scrollbar { width: 6px; }
+.ep-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
+
+.ep-log-content {
+  margin: 0;
+  color: #e2e8f0;
+  font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.ep-log-waiting {
+  color: rgba(255,255,255,.3);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.ep-log-placeholder {
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.2); font-size: 12px;
+}

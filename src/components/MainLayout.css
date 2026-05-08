@@ -1,0 +1,135 @@
+.layout-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-tertiary);
+}
+
+.layout-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 44px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+
+.layout-titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 70px; /* traffic light buttons için boşluk */
+}
+
+.layout-app-icon {
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+}
+.layout-app-icon img {
+  width: 22px; height: 22px;
+  object-fit: contain;
+}
+
+.layout-project-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.layout-scenario-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.layout-change-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+  -webkit-app-region: no-drag;
+}
+
+.layout-change-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.layout-java-warn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: rgba(249,226,175,.1);
+  border-bottom: 1px solid rgba(249,226,175,.25);
+  font-size: 12px;
+  color: var(--yellow);
+  flex-shrink: 0;
+}
+
+.layout-java-warn-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color .12s;
+}
+.layout-java-warn-close:hover { color: var(--text-primary); }
+
+.layout-update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: rgba(42,157,92,.08);
+  border-bottom: 1px solid rgba(42,157,92,.2);
+  font-size: 12px;
+  color: var(--green);
+  flex-shrink: 0;
+}
+.layout-update-ready {
+  background: rgba(42,157,92,.13);
+  border-bottom-color: rgba(42,157,92,.35);
+}
+.layout-update-install-btn {
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .12s;
+}
+.layout-update-install-btn:hover { opacity: 0.85; }
+.layout-update-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color .12s;
+}
+.layout-update-close:hover { color: var(--text-primary); }
+
+.layout-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

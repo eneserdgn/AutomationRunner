@@ -1,0 +1,69 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Pegasus Airlines – exact brand palette */
+  --bg-primary:    #f4f4f4;
+  --bg-secondary:  #ffffff;
+  --bg-tertiary:   #ebebeb;
+  --bg-surface:    #e4e4e4;
+  --bg-hover:      #f9f9f9;
+  --text-primary:  #1a1a1a;
+  --text-secondary:#4a4a4a;
+  --text-muted:    #9a9a9a;
+  --accent:        #e30613;   /* Pegasus kırmızısı */
+  --accent-hover:  #c0040f;
+  --green:         #2a9d5c;
+  --yellow:        #ff8c00;   /* Pegasus turuncu (CTA buton) */
+  --red:           #e30613;
+  --purple:        #7c4dbc;
+  --teal:          #1a9b8c;
+  --border:        #dedede;
+  --sidebar-width: 400px;
+}
+
+body {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+input {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

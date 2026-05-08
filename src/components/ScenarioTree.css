@@ -1,0 +1,89 @@
+.st-root { display: flex; flex-direction: column; }
+
+.st-folder { margin-bottom: 1px; }
+
+.st-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.st-folder-row:hover { background: var(--bg-hover); }
+
+.st-expand-btn {
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.st-arrow { display: inline-block; font-weight: 700; transition: transform 0.15s; }
+.st-arrow-open { transform: rotate(90deg); }
+
+.st-folder-icon { font-size: 13px; flex-shrink: 0; }
+
+.st-folder-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.st-folder-stats { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.st-folder-body  { padding-left: 22px; }
+
+.st-scenario-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  transition: background 0.1s;
+  min-width: 0;
+}
+.st-scenario-row:hover   { background: var(--bg-hover); }
+.st-scenario-checked     { background: rgba(227,6,19,0.06); }
+
+.st-scenario-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.st-checkbox {
+  width: 14px; height: 14px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.st-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.st-dot-pass    { background: var(--green); }
+.st-dot-fail    { background: var(--red); }
+.st-dot-not-run { background: var(--text-muted); opacity: 0.5; }
+
+.st-badge {
+  font-size: 9px; font-weight: 700;
+  padding: 1px 5px; border-radius: 8px; line-height: 1.6;
+}
+.st-badge-pass   { background: rgba(166,227,161,0.18); color: var(--green); }
+.st-badge-fail   { background: rgba(243,139,168,0.18); color: var(--red); }
+.st-badge-notrun { background: rgba(108,112,134,0.25); color: var(--text-muted); }
+.st-badge-dur    {
+  background: rgba(249,226,175,0.12); color: var(--yellow);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.4px;
+}
