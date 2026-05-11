@@ -26,9 +26,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFilter: (projectPath, ids) => ipcRenderer.invoke('save-filter', projectPath, ids),
   loadFilter: (projectPath)      => ipcRenderer.invoke('load-filter', projectPath),
 
+  // Run config presets
+  loadRunConfigs: ()        => ipcRenderer.invoke('load-run-configs'),
+  saveRunConfigs: (configs) => ipcRenderer.invoke('save-run-configs', configs),
+
   // Report runs
   loadScenarioRuns:    (projectPath, scenario) => ipcRenderer.invoke('load-scenario-runs', { projectPath, scenario }),
   loadAllRunStatuses:  (projectPath)           => ipcRenderer.invoke('load-all-run-statuses', projectPath),
+  loadAnalysis:        (projectPath)           => ipcRenderer.invoke('load-analysis', projectPath),
+  exportHtmlReport:    (data, projectPath)     => ipcRenderer.invoke('export-html-report', { data, projectPath }),
 
   // Auto-update
   onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  (_, d) => cb(d)),

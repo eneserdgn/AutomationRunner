@@ -8,9 +8,10 @@ const { autoUpdater } = require('electron-updater');
 const activeProcesses = new Map(); // terminalId -> child process
 
 const isDev = process.env.NODE_ENV === 'development' || process.env.ELECTRON_START_URL;
-const STORE_PATH   = path.join(os.homedir(), '.pegasus-automation-runner', 'projects.json');
-const PRESETS_PATH = path.join(os.homedir(), '.pegasus-automation-runner', 'presets.json');
-const FILTERS_PATH = path.join(os.homedir(), '.pegasus-automation-runner', 'filters.json');
+const STORE_PATH       = path.join(os.homedir(), '.pegasus-automation-runner', 'projects.json');
+const PRESETS_PATH     = path.join(os.homedir(), '.pegasus-automation-runner', 'presets.json');
+const FILTERS_PATH     = path.join(os.homedir(), '.pegasus-automation-runner', 'filters.json');
+const RUN_CONFIGS_PATH = path.join(os.homedir(), '.pegasus-automation-runner', 'run-configs.json');
 
 function ensureStore() {
   const dir = path.dirname(STORE_PATH);
@@ -433,6 +434,21 @@ ipcMain.handle('select-directory', async () => {
 
 ipcMain.handle('get-presets', () => loadPresets());
 
+ipcMain.handle('load-run-configs', () => {
+  try {
+    if (!fs.existsSync(RUN_CONFIGS_PATH)) return [];
+    return JSON.parse(fs.readFileSync(RUN_CONFIGS_PATH, 'utf-8'));
+  } catch { return []; }
+});
+
+ipcMain.handle('save-run-configs', (_, configs) => {
+  try {
+    const dir = path.dirname(RUN_CONFIGS_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(RUN_CONFIGS_PATH, JSON.stringify(configs, null, 2));
+  } catch {}
+});
+
 ipcMain.handle('save-filter', (_, projectPath, ids) => {
   try {
     const all = fs.existsSync(FILTERS_PATH)
@@ -643,8 +659,12 @@ ipcMain.handle('load-all-run-statuses', (_, projectPath) => {
   if (!fs.existsSync(reportsDir)) return {};
   const files = fs.readdirSync(reportsDir)
     .filter(f => f.startsWith('run_') && f.endsWith('.json'))
-    .sort().reverse();
-  const statuses = {};
+    .sort().reverse() // newest first
+    .slice(0, 100);   // cap at 100 most recent — older files are irrelevant for current status
+
+  const latest = {}; // key → latest run (any status)
+  const latestPass = {}; // key → latest passing run
+
   for (const file of files) {
     try {
       const report = JSON.parse(fs.readFileSync(path.join(reportsDir, file), 'utf8'));
@@ -654,13 +674,253 @@ ipcMain.handle('load-all-run-statuses', (_, projectPath) => {
         for (const element of (feature.elements || [])) {
           if (element.type === 'background') continue;
           const key = `${relPath}:${element.line}`;
-          if (statuses[key]) continue; // already have latest
-          statuses[key] = cucumberScenarioStatus(element);
+          const result = cucumberScenarioStatus(element);
+          if (!latest[key]) latest[key] = result;
+          if (!latestPass[key] && result.status === 'pass') latestPass[key] = result;
         }
       }
     } catch {}
   }
+
+  // Prefer latest passing run; fall back to latest run
+  const statuses = {};
+  for (const key of Object.keys(latest)) {
+    statuses[key] = latestPass[key] || latest[key];
+  }
   return statuses;
+});
+
+function generateHtmlReport(data, projectPath) {
+  const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const fmtMs = ms => {
+    if (!ms && ms !== 0) return '—';
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms/1000).toFixed(1)}s`;
+    const m = Math.floor(ms/60000), s = Math.round((ms%60000)/1000);
+    return s ? `${m}dk ${s}s` : `${m}dk`;
+  };
+  const fmtDate = iso => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso), p = n => String(n).padStart(2,'0');
+      return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    } catch { return '—'; }
+  };
+
+  const { summary, steps = [], stepDurations = [], scenarios = [] } = data;
+  const passRate   = summary.totalRuns > 0 ? Math.round(summary.passCount / summary.totalRuns * 100) : 0;
+  const now        = fmtDate(new Date().toISOString());
+  const projectName = path.basename(projectPath);
+
+  const stepsHtml = steps.length === 0
+    ? '<p class="empty">Başarısız adım yok.</p>'
+    : steps.map(step => {
+        const failRate = step.totalRuns > 0 ? Math.round(step.failCount / step.totalRuns * 100) : 0;
+        const failuresHtml = step.failures.map(f => `
+          <div class="fi">
+            <div class="fi-name">${esc(f.scenarioName)}</div>
+            <div class="fi-file">${esc(f.scenarioFile)}:${f.lineNumber} &nbsp;·&nbsp; ${fmtDate(f.runDate)}</div>
+            ${f.errorMessage ? `<pre class="fi-err">${esc(f.errorMessage.slice(0,600))}${f.errorMessage.length>600?'\n…':''}</pre>` : ''}
+          </div>`).join('');
+        return `<div class="sc">
+          <div class="sc-hd">
+            <span class="sc-text">${esc(step.text)}</span>
+            <span class="sc-badge">${step.failCount} başarısızlık &nbsp;·&nbsp; %${failRate} hata</span>
+          </div>${failuresHtml}</div>`;
+      }).join('');
+
+  const durHtml = stepDurations.slice(0,200).map(r => {
+    const fr = r.totalRuns > 0 ? Math.round(r.failCount/r.totalRuns*100) : 0;
+    const txt = r.text.length > 90 ? r.text.slice(0,90)+'…' : r.text;
+    return `<tr>
+      <td title="${esc(r.text)}">${esc(txt)}</td>
+      <td class="n">${r.totalRuns}</td>
+      <td class="n p">${r.passCount}</td>
+      <td class="n f">${r.failCount||'<span style="color:#adb5bd">0</span>'}</td>
+      <td class="n">${fr>0?`<span class="f">%${fr}</span>`:'—'}</td>
+      <td class="n">${fmtMs(r.minDur)}</td>
+      <td class="n b">${fmtMs(r.avgDur)}</td>
+      <td class="n">${fmtMs(r.maxDur)}</td></tr>`;
+  }).join('');
+
+  const rateColor = passRate >= 80 ? 'p' : passRate >= 50 ? 'w' : 'f';
+
+  return `<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8">
+<title>Test Raporu — ${esc(projectName)}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f5f7;color:#1a1a2e;font-size:14px;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:36px 24px}
+header{margin-bottom:28px}
+h1{font-size:22px;font-weight:800}
+.meta{font-size:12px;color:#868e96;margin-top:5px}
+.sum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px}
+.s{background:#fff;border:1px solid #e9ecef;border-radius:10px;padding:14px 20px;min-width:110px}
+.sv{font-size:26px;font-weight:800;line-height:1}
+.sl{font-size:11px;color:#868e96;margin-top:3px;text-transform:uppercase;letter-spacing:.4px}
+.p{color:#2a9d5c}.f{color:#e30613}.w{color:#f4a261}.m{color:#868e96}
+section{margin-bottom:40px}
+h2{font-size:15px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e9ecef;display:flex;align-items:center;gap:8px}
+.bdg{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#f1f3f5;color:#495057}
+.sc{background:#fff;border:1px solid #e9ecef;border-radius:8px;margin-bottom:10px;overflow:hidden}
+.sc-hd{padding:11px 16px;display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;border-bottom:1px solid #e9ecef;gap:12px}
+.sc-text{font-size:13px;font-weight:600;flex:1;min-width:0}
+.sc-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:#fce8e8;color:#e30613;white-space:nowrap;flex-shrink:0}
+.fi{padding:10px 16px;border-bottom:1px solid #f5f5f5}
+.fi:last-child{border-bottom:none}
+.fi-name{font-size:12px;font-weight:600;color:#343a40}
+.fi-file{font-size:11px;color:#adb5bd;font-family:monospace;margin-top:2px}
+.fi-err{font-size:11px;color:#c92a2a;background:#fff5f5;border:1px solid #ffd8d8;padding:8px 10px;border-radius:6px;margin-top:6px;white-space:pre-wrap;font-family:monospace;overflow:auto;max-height:140px}
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e9ecef;border-radius:10px;overflow:hidden}
+th{background:#f8f9fa;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#868e96;padding:10px 14px;text-align:left;border-bottom:1px solid #e9ecef;white-space:nowrap}
+th.n{text-align:right}
+td{padding:8px 14px;font-size:12px;border-bottom:1px solid #f5f5f5}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}tr:hover td{background:#f8f9fa}
+.b{font-weight:700}
+.empty{color:#adb5bd;font-size:13px;padding:24px;text-align:center}
+footer{text-align:center;font-size:11px;color:#adb5bd;margin-top:48px;padding-top:16px;border-top:1px solid #e9ecef}
+</style></head>
+<body><div class="wrap">
+  <header>
+    <h1>Test Analiz Raporu</h1>
+    <p class="meta">Proje: <strong>${esc(projectName)}</strong> &nbsp;·&nbsp; ${now}</p>
+  </header>
+
+  <div class="sum">
+    <div class="s"><div class="sv m">${summary.totalRuns}</div><div class="sl">Toplam Koşum</div></div>
+    <div class="s"><div class="sv p">${summary.passCount}</div><div class="sl">Pass</div></div>
+    <div class="s"><div class="sv f">${summary.failCount}</div><div class="sl">Fail</div></div>
+    <div class="s"><div class="sv ${rateColor}">%${passRate}</div><div class="sl">Başarı Oranı</div></div>
+    <div class="s"><div class="sv f">${steps.length}</div><div class="sl">Başarısız Adım</div></div>
+    <div class="s"><div class="sv f">${scenarios.length}</div><div class="sl">Başarısız Senaryo</div></div>
+  </div>
+
+  <section>
+    <h2>Başarısız Adımlar <span class="bdg">${steps.length}</span></h2>
+    ${stepsHtml}
+  </section>
+
+  <section>
+    <h2>Süre Analizi <span class="bdg">${stepDurations.length} adım</span></h2>
+    ${stepDurations.length === 0 ? '<p class="empty">Süre verisi yok.</p>' : `
+    <table><thead><tr>
+      <th>Adım</th><th class="n">Kullanım</th><th class="n">Pass</th>
+      <th class="n">Fail</th><th class="n">Hata %</th>
+      <th class="n">Min</th><th class="n">Ortalama</th><th class="n">Maks.</th>
+    </tr></thead><tbody>${durHtml}</tbody></table>`}
+  </section>
+
+  <footer>Pegasus Test Runner &nbsp;·&nbsp; ${now}</footer>
+</div></body></html>`;
+}
+
+ipcMain.handle('export-html-report', async (_, { data, projectPath }) => {
+  const defaultName = `test-raporu-${new Date().toISOString().slice(0,10)}.html`;
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'HTML Raporu Kaydet',
+    defaultPath: path.join(os.homedir(), 'Desktop', defaultName),
+    filters: [{ name: 'HTML Dosyası', extensions: ['html'] }],
+  });
+  if (canceled || !filePath) return { canceled: true };
+  fs.writeFileSync(filePath, generateHtmlReport(data, projectPath), 'utf8');
+  return { ok: true, filePath };
+});
+
+ipcMain.handle('load-analysis', (_, projectPath) => {
+  const reportsDir = path.join(projectPath, 'pegasus-reports');
+  if (!fs.existsSync(reportsDir)) return { steps: [], scenarios: [], summary: { totalRuns: 0, passCount: 0, failCount: 0 } };
+
+  const files = fs.readdirSync(reportsDir)
+    .filter(f => f.startsWith('run_') && f.endsWith('.json'))
+    .sort().reverse();
+
+  const stepMap     = new Map();
+  const scenarioMap = new Map();
+  let totalRuns = 0, passCount = 0, failCount = 0;
+
+  for (const file of files) {
+    try {
+      const report = JSON.parse(fs.readFileSync(path.join(reportsDir, file), 'utf8'));
+      if (!Array.isArray(report)) continue;
+
+      const m = file.match(/^run_(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})/);
+      const runDate = m ? `${m[1]}T${m[2]}:${m[3]}:${m[4]}` : null;
+      const runId   = file.replace('.json', '');
+
+      for (const feature of report) {
+        const relPath = normalizeUri(feature.uri, projectPath);
+        for (const element of (feature.elements || [])) {
+          if (element.type === 'background') continue;
+          totalRuns++;
+          const elementFailed = (element.steps || []).some(s => s.result?.status === 'failed');
+          if (elementFailed) failCount++; else passCount++;
+
+          // Scenario tracking
+          const sKey = `${relPath}:${element.line}`;
+          if (!scenarioMap.has(sKey)) {
+            scenarioMap.set(sKey, { name: element.name, filePath: relPath, lineNumber: element.line, totalRuns: 0, failCount: 0, lastStatus: null });
+          }
+          const sd = scenarioMap.get(sKey);
+          sd.totalRuns++;
+          if (elementFailed) sd.failCount++;
+          if (sd.lastStatus === null) sd.lastStatus = elementFailed ? 'fail' : 'pass';
+
+          // Step tracking
+          for (const step of (element.steps || [])) {
+            const stepText = ((step.keyword || '').trim() + ' ' + (step.name || '')).trim();
+            if (!stepText) continue;
+            if (!stepMap.has(stepText)) stepMap.set(stepText, { text: stepText, totalRuns: 0, failCount: 0, failures: [], durationsMs: [] });
+            const st = stepMap.get(stepText);
+            st.totalRuns++;
+            const stepNs = (step.result?.duration || 0) + hooksDuration(step.before) + hooksDuration(step.after);
+            const stepMs = Math.round(stepNs / 1_000_000);
+            if (stepMs > 0) st.durationsMs.push(stepMs);
+            if (step.result?.status === 'failed') {
+              st.failCount++;
+              st.failures.push({
+                scenarioName: element.name,
+                scenarioFile: relPath,
+                lineNumber:   element.line,
+                runId,
+                runDate,
+                errorMessage: step.result?.error_message || null,
+                screenshots:  extractScreenshots(step.after),
+              });
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  const steps = [...stepMap.values()]
+    .filter(s => s.failCount > 0)
+    .sort((a, b) => b.failCount - a.failCount || b.totalRuns - a.totalRuns);
+
+  const scenarios = [...scenarioMap.values()]
+    .filter(s => s.failCount > 0)
+    .sort((a, b) => b.failCount - a.failCount);
+
+  const stepDurations = [...stepMap.values()]
+    .filter(s => s.durationsMs.length > 0)
+    .map(s => {
+      const sorted = [...s.durationsMs].sort((a, b) => a - b);
+      const sum    = s.durationsMs.reduce((a, b) => a + b, 0);
+      return {
+        text:      s.text,
+        totalRuns: s.totalRuns,
+        passCount: s.totalRuns - s.failCount,
+        failCount: s.failCount,
+        minDur:    sorted[0],
+        maxDur:    sorted[sorted.length - 1],
+        avgDur:    Math.round(sum / s.durationsMs.length),
+      };
+    })
+    .sort((a, b) => b.avgDur - a.avgDur);
+
+  return { steps, scenarios, stepDurations, summary: { totalRuns, passCount, failCount } };
 });
 
 function parseGaugeReport(report, scenario) {
@@ -833,7 +1093,25 @@ ipcMain.handle('start-terminal', async (event, { id, projectPath, scenarios }) =
       deleteDirSafe(tempDir);
       terminalTempDirs.delete(id);
 
-      event.sender.send('terminal-output', { id, data: '', type: 'exit', code: code ?? 1, reportFile });
+      // Collect failed scenario keys so the frontend can spawn a retry terminal
+      let failedScenarios = [];
+      if (code !== 0 && fs.existsSync(reportFile)) {
+        try {
+          const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+          if (Array.isArray(report)) {
+            for (const feature of report) {
+              const relPath = normalizeUri(feature.uri, projectPath);
+              for (const element of (feature.elements || [])) {
+                if (element.type === 'background') continue;
+                const failed = (element.steps || []).some(s => s.result?.status === 'failed');
+                if (failed) failedScenarios.push({ filePath: relPath, lineNumber: element.line });
+              }
+            }
+          }
+        } catch {}
+      }
+
+      event.sender.send('terminal-output', { id, data: '', type: 'exit', code: code ?? 1, reportFile, failedScenarios });
     });
 
     child.on('error', err => {

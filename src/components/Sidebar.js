@@ -71,7 +71,7 @@ function ScenarioItem({ scenario, isActive, onSelect }) {
   );
 }
 
-export default function Sidebar({ scenarios, totalCount, selectedId, onSelect, search, onSearch, loading, error, onOpenFilter, isFiltered, onRefresh, onRun }) {
+export default function Sidebar({ scenarios, totalCount, selectedId, onSelect, search, onSearch, loading, error, onOpenFilter, isFiltered, onRefresh, statusesLoading, onRun }) {
   const commonPrefix = useMemo(() => getCommonDirPrefix(scenarios), [scenarios]);
   const tree         = useMemo(() => buildTree(scenarios, commonPrefix), [scenarios, commonPrefix]);
   const searchActive = search.trim().length > 0;
@@ -85,6 +85,10 @@ export default function Sidebar({ scenarios, totalCount, selectedId, onSelect, s
   const fail    = scenarios.filter(s => s.status === 'fail').length;
   const notRun  = scenarios.filter(s => s.status === 'not-run').length;
   const totalDur = formatDurationLong(scenarios.reduce((s, c) => s + (c.duration || 0), 0));
+  const withDur  = scenarios.filter(s => s.duration > 0);
+  const avgDur   = withDur.length > 0
+    ? formatDuration(Math.round(withDur.reduce((s, c) => s + c.duration, 0) / withDur.length))
+    : null;
 
   return (
     <aside className="sidebar">
@@ -94,6 +98,9 @@ export default function Sidebar({ scenarios, totalCount, selectedId, onSelect, s
           <span className="sidebar-count">
             {isFiltered ? `${scenarios.length} / ${totalCount}` : scenarios.length}
           </span>
+          {avgDur && (
+            <span className="sidebar-avg-dur" title="Ortalama senaryo süresi">⌀ {avgDur}</span>
+          )}
           <div className="sidebar-title-actions">
             <button
               className="sidebar-action-btn sidebar-run-btn"
@@ -106,11 +113,12 @@ export default function Sidebar({ scenarios, totalCount, selectedId, onSelect, s
               </svg>
             </button>
             <button
-              className="sidebar-action-btn"
+              className={`sidebar-action-btn ${statusesLoading ? 'sidebar-refreshing' : ''}`}
               onClick={onRefresh}
               title="Yenile"
+              disabled={statusesLoading}
             >
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className={statusesLoading ? 'sidebar-spin' : ''}>
                 <path d="M13.5 2.5A6.5 6.5 0 1 1 8 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 <polyline points="11,1 13.5,2.5 12,5" fill="currentColor"/>
               </svg>

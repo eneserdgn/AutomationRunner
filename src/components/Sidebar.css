@@ -40,6 +40,14 @@
   flex-shrink: 0;
 }
 
+.sidebar-avg-dur {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--yellow);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  flex-shrink: 0;
+}
+
 .sidebar-title-actions {
   margin-left: auto;
   display: flex;
@@ -68,6 +76,20 @@
 .sidebar-run-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.sidebar-refreshing {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes sidebar-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.sidebar-spin {
+  animation: sidebar-rotate 0.8s linear infinite;
+  transform-origin: center;
 }
 
 .sidebar-filter-active {

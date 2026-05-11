@@ -30,8 +30,8 @@
 .ep-header-left  { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .ep-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-.ep-header-icon      { font-size: 11px; color: var(--accent); }
-.ep-header-icon-spin { display: inline-block; animation: ep-spin 1.4s linear infinite; color: var(--accent); }
+.ep-header-icon      { font-size: 11px; color: var(--text-muted); }
+.ep-header-icon-spin { display: inline-block; animation: ep-spin 1.4s linear infinite; color: #89b4fa; }
 .ep-header-title     { font-size: 12px; font-weight: 700; color: var(--text-secondary); flex-shrink: 0; }
 
 /* ── Badges ── */
@@ -39,7 +39,7 @@
   font-size: 10px; font-weight: 700;
   padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
 }
-.ep-badge-running { background: rgba(227,6,19,.12);  color: var(--accent);  border: 1px solid rgba(227,6,19,.25); }
+.ep-badge-running { background: rgba(137,180,250,.12); color: #89b4fa;        border: 1px solid rgba(137,180,250,.3); }
 .ep-badge-queue   { background: rgba(224,138,0,.12);  color: var(--yellow);  border: 1px solid rgba(224,138,0,.25); }
 .ep-badge-done    { background: rgba(42,157,92,.12);  color: var(--green);   border: 1px solid rgba(42,157,92,.25); }
 .ep-badge-failed  { background: rgba(227,6,19,.15);   color: var(--red);     border: 1px solid rgba(227,6,19,.3); }
@@ -94,16 +94,16 @@
   flex-shrink: 0;
 }
 
-/* ── Running tab — highlighted, animated ── */
+/* ── Running tab — blue ── */
 .ep-tab-running {
-  background: rgba(227,6,19,.08);
-  border-color: rgba(227,6,19,.3);
-  color: var(--accent);
+  background: rgba(137,180,250,.1);
+  border-color: rgba(137,180,250,.35);
+  color: #89b4fa;
 }
-.ep-tab-running:hover { background: rgba(227,6,19,.14); }
+.ep-tab-running:hover { background: rgba(137,180,250,.17); }
 .ep-tab-running.ep-tab-active {
-  background: rgba(227,6,19,.14) !important;
-  border-color: var(--accent) !important;
+  background: rgba(137,180,250,.17) !important;
+  border-color: #89b4fa !important;
 }
 
 /* ── Done tab — green ── */
@@ -145,12 +145,12 @@
   color: var(--text-secondary) !important;
 }
 
-/* ── Queued tab — dimmed, dashed border ── */
+/* ── Queued tab — amber, clearly waiting ── */
 .ep-tab-queued {
-  background: transparent;
-  border: 1px dashed var(--border);
-  color: var(--text-muted);
-  opacity: 0.6;
+  background: rgba(249,226,175,.07);
+  border: 1px dashed rgba(249,226,175,.35);
+  color: var(--yellow);
+  opacity: 0.75;
   cursor: default;
 }
 .ep-tab-queued-item { pointer-events: none; }
@@ -160,7 +160,7 @@
   font-size: 12px; flex-shrink: 0;
   display: inline-block;
   animation: ep-spin 1.2s linear infinite;
-  color: var(--accent);
+  color: #89b4fa;
 }
 .ep-status-ok    { font-size: 11px; font-weight: 700; flex-shrink: 0; color: var(--green); }
 .ep-status-fail  { font-size: 11px; font-weight: 700; flex-shrink: 0; color: var(--red); }
@@ -173,6 +173,12 @@
 /* ── Tab contents ── */
 .ep-tab-label { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
 .ep-tab-dur   { font-size: 10px; opacity: 0.7; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.ep-tab-dur-countdown {
+  opacity: 1;
+  color: var(--yellow);
+  font-weight: 600;
+  animation: ep-pulse 1s ease-in-out infinite;
+}
 .ep-tab-count { font-size: 10px; opacity: 0.6; flex-shrink: 0; }
 
 .ep-tab-stop {

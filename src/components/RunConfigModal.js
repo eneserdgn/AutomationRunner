@@ -55,7 +55,7 @@ function SelectionTab({ allScenarios, selection, onToggle }) {
   );
 }
 
-function ConfigTab({ count, parallel, setParallel, batchSize, setBatchSize, delay, setDelay }) {
+function ConfigTab({ count, parallel, setParallel, batchSize, setBatchSize, delay, setDelay, retryCount, setRetryCount }) {
   const safeParallel  = Math.max(1, parallel  || 1);
   const safeBatchSize = Math.max(1, batchSize || 1);
   const safeDelay     = Math.max(0, delay     || 0);
@@ -107,6 +107,14 @@ function ConfigTab({ count, parallel, setParallel, batchSize, setBatchSize, dela
             <span className="rcm-input-unit">sn</span>
           </div>
         </div>
+        <div className="rcm-field">
+          <label className="rcm-label">Fail Retry</label>
+          <div className="rcm-input-wrap">
+            <input className="rcm-input" type="number" min="0" max="3" value={retryCount}
+              onChange={e => setRetryCount(+e.target.value)} />
+            <span className="rcm-input-unit">kez</span>
+          </div>
+        </div>
       </div>
 
       <div className="rcm-preview">
@@ -143,15 +151,16 @@ function ConfigTab({ count, parallel, setParallel, batchSize, setBatchSize, dela
   );
 }
 
-export default function RunConfigModal({ allScenarios, initialSelection, initialTab = 0, onStart, onClose }) {
+export default function RunConfigModal({ allScenarios, initialSelection, initialTab = 0, initialConfig = null, onStart, onClose }) {
   const [tab, setTab] = useState(initialTab);
 
   const [selection, setSelection] = useState(
     () => initialSelection ?? new Set(allScenarios.map(s => s.id))
   );
-  const [parallel,  setParallel]  = useState(1);
-  const [batchSize, setBatchSize] = useState(() => (initialSelection ? initialSelection.size : allScenarios.length) || 1);
-  const [delay,     setDelay]     = useState(60);
+  const [parallel,    setParallel]    = useState(initialConfig?.parallel    ?? 1);
+  const [batchSize,   setBatchSize]   = useState(initialConfig?.batchSize   ?? ((initialSelection ? initialSelection.size : allScenarios.length) || 1));
+  const [delay,       setDelay]       = useState(initialConfig?.delay       ?? 60);
+  const [retryCount,  setRetryCount]  = useState(initialConfig?.retryCount  ?? 0);
 
   function toggle(ids, select) {
     setSelection(prev => {
@@ -164,9 +173,10 @@ export default function RunConfigModal({ allScenarios, initialSelection, initial
   const selectedScenarios = allScenarios.filter(s => selection.has(s.id));
   const count = selectedScenarios.length;
 
-  const safeParallel  = Math.max(1, parallel  || 1);
-  const safeBatchSize = Math.max(1, batchSize || 1);
-  const safeDelay     = Math.max(0, delay     || 0);
+  const safeParallel  = Math.max(1, parallel    || 1);
+  const safeBatchSize = Math.max(1, batchSize   || 1);
+  const safeDelay     = Math.max(0, delay       || 0);
+  const safeRetry     = Math.min(3, Math.max(0, retryCount || 0));
 
   function buildBatches() {
     const result = [];
@@ -179,7 +189,7 @@ export default function RunConfigModal({ allScenarios, initialSelection, initial
 
   function handleStart() {
     const batches = buildBatches();
-    onStart({ parallel: safeParallel, batchSize: safeBatchSize, delay: safeDelay, batches });
+    onStart({ parallel: safeParallel, batchSize: safeBatchSize, delay: safeDelay, retryCount: safeRetry, batches });
   }
 
   return (
@@ -203,9 +213,10 @@ export default function RunConfigModal({ allScenarios, initialSelection, initial
           {tab === 1 && (
             <ConfigTab
               count={count}
-              parallel={parallel}   setParallel={setParallel}
-              batchSize={batchSize} setBatchSize={setBatchSize}
-              delay={delay}         setDelay={setDelay}
+              parallel={parallel}       setParallel={setParallel}
+              batchSize={batchSize}     setBatchSize={setBatchSize}
+              delay={delay}             setDelay={setDelay}
+              retryCount={retryCount}   setRetryCount={setRetryCount}
             />
           )}
         </div>

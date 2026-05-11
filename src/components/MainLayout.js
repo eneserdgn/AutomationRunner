@@ -4,6 +4,8 @@ import ScenarioDetail from './ScenarioDetail';
 import FilterModal from './FilterModal';
 import RunConfigModal from './RunConfigModal';
 import ExecutionPanel from './ExecutionPanel';
+import AnalysisPanel from './AnalysisPanel';
+import PresetsPanel from './PresetsPanel';
 import './MainLayout.css';
 
 export default function MainLayout({ project, onChangeProject }) {
@@ -16,14 +18,18 @@ export default function MainLayout({ project, onChangeProject }) {
   const [filterOpen, setFilterOpen]     = useState(false);
   const [refreshKey, setRefreshKey]     = useState(0);
 
-  const [runModalOpen, setRunModalOpen] = useState(false);
-  const [runScenarios, setRunScenarios] = useState([]);
-  const [execution, setExecution]       = useState(null);
+  const [runModalOpen, setRunModalOpen]   = useState(false);
+  const [runScenarios, setRunScenarios]   = useState([]);
+  const [runInitialConfig, setRunInitialConfig] = useState(null);
+  const [execution, setExecution]         = useState(null);
   const [javaWarn, setJavaWarn]         = useState('');
   const [runs, setRuns]                 = useState([]);
   const [runsKey, setRunsKey]           = useState(0);
   const [allRunStatuses, setAllRunStatuses] = useState({});
+  const [statusesLoading, setStatusesLoading] = useState(false);
   const [updateInfo, setUpdateInfo]     = useState(null); // { version, ready }
+  const [activeTab, setActiveTab]       = useState('scenarios'); // 'scenarios' | 'analysis' | 'presets'
+  const [presets, setPresets]           = useState([]);
 
 
   useEffect(() => {
@@ -33,19 +39,34 @@ export default function MainLayout({ project, onChangeProject }) {
       setUpdateInfo({ version, ready: true }));
   }, []);
 
+  useEffect(() => {
+    window.electronAPI?.loadRunConfigs?.().then(data => {
+      if (Array.isArray(data)) setPresets(data);
+    }).catch(() => {});
+  }, []);
+
+  function handlePresetsChange(updated) {
+    setPresets(updated);
+    window.electronAPI?.saveRunConfigs?.(updated).catch(() => {});
+  }
+
   // Keep project.path accessible inside the IPC output handler (via closure over ref)
   const projectPathRef = useRef(project.path);
   useEffect(() => { projectPathRef.current = project.path; }, [project.path]);
+
+  // Tracks which terminal IDs have already had startTerminal called, preventing
+  // double-starts when the state updater is re-invoked (React Strict Mode / concurrent features).
+  const startedTerminalIds = useRef(new Set());
 
   // Register terminal output listener once on mount
   useEffect(() => {
     if (!window.electronAPI?.onTerminalOutput) return;
 
-    window.electronAPI.onTerminalOutput(({ id, data, type, code, reportFile }) => {
+    window.electronAPI.onTerminalOutput(({ id, data, type, code, reportFile, failedScenarios = [] }) => {
+      if (type === 'exit') setRunsKey(k => k + 1);
+
       setExecution(prev => {
         if (!prev) return prev;
-
-        if (type === 'exit') setRunsKey(k => k + 1);
 
         const updatedTerminals = prev.terminals.map(t => {
           if (t.id !== id) return t;
@@ -55,39 +76,62 @@ export default function MainLayout({ project, onChangeProject }) {
           return { ...t, logs: [...t.logs, data] };
         });
 
-        // Dequeue next batch when a terminal finishes
-        if (type === 'exit' && prev.queuedBatches.length > 0) {
-          const [next, ...rest] = prev.queuedBatches;
-          const newId = prev.nextId;
-          const newTerminal = {
-            id:         newId,
-            label:      `Terminal ${newId}`,
-            status:     'running',
-            logs:       [],
-            scenarios:  next.scenarios,
-            from:       next.from,
-            to:         next.to,
-            count:      next.count,
-            startedAt:  Date.now(),
-          };
+        if (type !== 'exit') return { ...prev, terminals: updatedTerminals };
 
-          setTimeout(() => {
-            window.electronAPI?.startTerminal({
-              id:          newId,
-              projectPath: projectPathRef.current,
-              scenarios:   next.scenarios,
-            });
-          }, (prev.config.delay || 0) * 1000);
+        const newTerminals    = [...updatedTerminals];
+        let newNextId         = prev.nextId;
+        let newQueuedBatches  = prev.queuedBatches;
 
-          return {
-            ...prev,
-            terminals:      [...updatedTerminals, newTerminal],
-            queuedBatches:  rest,
-            nextId:         newId + 1,
-          };
+        // ── If this terminal failed, push a retry batch to the FRONT of the queue ──
+        // This way retry respects the parallel limit — it starts only when a slot frees up.
+        const exitingTerminal = prev.terminals.find(t => t.id === id);
+        const retryLeft = exitingTerminal?.retryLeft ?? 0;
+        if (retryLeft > 0 && failedScenarios.length > 0) {
+          const failedSet = new Set(failedScenarios.map(fs => `${fs.filePath}:${fs.lineNumber}`));
+          const retryScenarios = (exitingTerminal.scenarios || []).filter(
+            s => failedSet.has(`${s.filePath}:${s.lineNumber}`)
+          );
+          if (retryScenarios.length > 0) {
+            newQueuedBatches = [
+              ...newQueuedBatches,
+              { scenarios: retryScenarios, from: null, to: null, count: retryScenarios.length, isRetry: true, retryLeft: retryLeft - 1, delay: prev.config.delay || 0 },
+            ];
+          }
         }
 
-        return { ...prev, terminals: updatedTerminals };
+        // ── Dequeue ONE batch (retry has priority since it was pushed to front) ──
+        if (newQueuedBatches.length > 0) {
+          const [next, ...rest] = newQueuedBatches;
+          newQueuedBatches = rest;
+          const queueId  = newNextId++;
+          const isRetry  = next.isRetry || false;
+          const queueDelay = prev.config.delay || 0;
+          newTerminals.push({
+            id:        queueId,
+            label:     isRetry ? `↺ Retry (${next.count} fail)` : `Terminal ${queueId}`,
+            status:    'running',
+            logs:      [],
+            scenarios: next.scenarios,
+            from:      next.from,
+            to:        next.to,
+            count:     next.count,
+            startedAt: Date.now() + queueDelay * 1000,
+            isRetry,
+            retryLeft: isRetry ? (next.retryLeft ?? 0) : (prev.config.retryCount || 0),
+          });
+          if (!startedTerminalIds.current.has(queueId)) {
+            startedTerminalIds.current.add(queueId);
+            setTimeout(() => {
+              window.electronAPI?.startTerminal({
+                id:          queueId,
+                projectPath: projectPathRef.current,
+                scenarios:   next.scenarios,
+              });
+            }, (prev.config.delay || 0) * 1000);
+          }
+        }
+
+        return { ...prev, terminals: newTerminals, queuedBatches: newQueuedBatches, nextId: newNextId };
       });
     });
 
@@ -178,7 +222,12 @@ export default function MainLayout({ project, onChangeProject }) {
 
   useEffect(() => {
     if (!window.electronAPI?.loadAllRunStatuses) return;
-    window.electronAPI.loadAllRunStatuses(project.path).then(setAllRunStatuses).catch(() => {});
+    let cancelled = false;
+    setStatusesLoading(true);
+    window.electronAPI.loadAllRunStatuses(project.path)
+      .then(data => { if (!cancelled) { setAllRunStatuses(data); setStatusesLoading(false); } })
+      .catch(() => { if (!cancelled) setStatusesLoading(false); });
+    return () => { cancelled = true; };
   }, [project.path, runsKey]); // eslint-disable-line
 
   const enrichedScenarios = useMemo(() => {
@@ -205,8 +254,9 @@ export default function MainLayout({ project, onChangeProject }) {
   const selected   = enrichedScenarios.find(s => s.id === selectedId) || null;
   const isFiltered = activeIds !== null;
 
-  function openRunModal(scenarioList, tab = 0) {
+  function openRunModal(scenarioList, tab = 0, config = null) {
     setRunScenarios(scenarioList);
+    setRunInitialConfig(config);
     setRunModalOpen(tab);
   }
 
@@ -219,6 +269,8 @@ export default function MainLayout({ project, onChangeProject }) {
     setExecution(prev => {
       const existingTerminals = prev?.terminals ?? [];
       const startId = (prev?.nextId ?? 1);
+      // Reset the dedup set for each new run batch
+      startedTerminalIds.current = new Set();
 
       const newTerminals = initialBatches.map((batch, i) => ({
         id:        startId + i,
@@ -231,7 +283,8 @@ export default function MainLayout({ project, onChangeProject }) {
         from:      batch.from,
         to:        batch.to,
         count:     batch.count,
-        startedAt: Date.now(),
+        startedAt: Date.now() + i * (delay || 0) * 1000,
+        retryLeft: config.retryCount || 0,
       }));
 
       // Spawn initial terminals with staggered delay
@@ -317,6 +370,43 @@ export default function MainLayout({ project, onChangeProject }) {
         </div>
       )}
 
+      <div className="layout-tabs">
+        <button
+          className={`layout-tab ${activeTab === 'scenarios' ? 'layout-tab-active' : ''}`}
+          onClick={() => setActiveTab('scenarios')}
+        >Senaryolar</button>
+        <button
+          className={`layout-tab ${activeTab === 'analysis' ? 'layout-tab-active' : ''}`}
+          onClick={() => setActiveTab('analysis')}
+        >Analiz</button>
+        <button
+          className={`layout-tab ${activeTab === 'presets' ? 'layout-tab-active' : ''}`}
+          onClick={() => setActiveTab('presets')}
+        >Presetler</button>
+      </div>
+
+      {activeTab === 'analysis' ? (
+        <AnalysisPanel
+          projectPath={project.path}
+          refreshKey={runsKey}
+          onRunFailures={failureKeys => {
+            const keySet = new Set(failureKeys.map(f => `${f.filePath}:${f.lineNumber}`));
+            const matched = enrichedScenarios.filter(s => keySet.has(`${s.filePath}:${s.lineNumber}`));
+            if (matched.length > 0) openRunModal(matched, 1);
+          }}
+        />
+      ) : activeTab === 'presets' ? (
+        <PresetsPanel
+          presets={presets}
+          allScenarios={enrichedScenarios}
+          onPresetsChange={handlePresetsChange}
+          onRun={preset => {
+            const ids = preset.scenarioIds ? new Set(preset.scenarioIds) : null;
+            const selected = ids ? enrichedScenarios.filter(s => ids.has(s.id)) : enrichedScenarios;
+            openRunModal(selected, 0, preset);
+          }}
+        />
+      ) : (
       <div className="layout-body">
         <Sidebar
           scenarios={visible}
@@ -330,6 +420,7 @@ export default function MainLayout({ project, onChangeProject }) {
           onOpenFilter={() => setFilterOpen(true)}
           isFiltered={isFiltered}
           onRefresh={() => setRefreshKey(k => k + 1)}
+          statusesLoading={statusesLoading}
           onRun={() => openRunModal(visible, 0)}
         />
         <ScenarioDetail
@@ -339,6 +430,7 @@ export default function MainLayout({ project, onChangeProject }) {
           onRun={() => openRunModal(selected ? [selected] : [], 1)}
         />
       </div>
+      )}
 
       <ExecutionPanel
         execution={execution}
@@ -362,8 +454,9 @@ export default function MainLayout({ project, onChangeProject }) {
           allScenarios={visible}
           initialSelection={runScenarios.length === visible.length ? null : new Set(runScenarios.map(s => s.id))}
           initialTab={runModalOpen}
+          initialConfig={runInitialConfig}
           onStart={handleRunStart}
-          onClose={() => setRunModalOpen(false)}
+          onClose={() => { setRunModalOpen(false); setRunInitialConfig(null); }}
         />
       )}
     </div>

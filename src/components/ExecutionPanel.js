@@ -2,16 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import './ExecutionPanel.css';
 
 function useDuration(startedAt, finishedAt) {
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0);
   useEffect(() => {
     if (finishedAt) return;
     const t = setInterval(() => setTick(v => v + 1), 1000);
     return () => clearInterval(t);
   }, [finishedAt]);
-  const ms = (finishedAt || Date.now()) - (startedAt || Date.now());
-  const s  = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}m ${s % 60}s`;
+
+  const end = finishedAt || Date.now();
+  const ms  = end - (startedAt || end);
+
+  if (ms < 0) {
+    const s = Math.ceil(-ms / 1000);
+    return { text: `${s}s`, countdown: true };
+  }
+  const s = Math.floor(ms / 1000);
+  return { text: s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`, countdown: false };
 }
 
 function StatusIcon({ status }) {
@@ -23,7 +29,7 @@ function StatusIcon({ status }) {
 }
 
 function TerminalTab({ terminal, isActive, onClick, onStop, onClose }) {
-  const duration = useDuration(terminal.startedAt, terminal.finishedAt);
+  const dur = useDuration(terminal.startedAt, terminal.finishedAt);
   return (
     <div
       className={[
@@ -36,8 +42,11 @@ function TerminalTab({ terminal, isActive, onClick, onStop, onClose }) {
     >
       <StatusIcon status={terminal.status} />
       <span className="ep-tab-label">{terminal.label}</span>
-      <span className="ep-tab-dur">{duration}</span>
-      {terminal.status === 'running' && (
+      {dur.countdown
+        ? <span className="ep-tab-dur ep-tab-dur-countdown">▶ {dur.text}</span>
+        : <span className="ep-tab-dur">{dur.text}</span>
+      }
+      {terminal.status === 'running' && !dur.countdown && (
         <button
           className="ep-tab-stop"
           onClick={e => { e.stopPropagation(); onStop(); }}

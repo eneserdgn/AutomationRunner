@@ -197,6 +197,9 @@ function RunTabs({ runs, activeIndex, onSelect }) {
               {run.status === 'pass' ? '✓' : '✕'}
             </span>
             <span className="sd-run-tab-label">{formatTabDate(run.runDate)}</span>
+            {run.duration > 0 && (
+              <span className="sd-run-tab-dur">{formatMs(run.duration)}</span>
+            )}
           </button>
         ))}
       </div>

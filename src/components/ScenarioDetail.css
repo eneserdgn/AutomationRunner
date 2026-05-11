@@ -444,6 +444,8 @@
 .sd-run-tab-pass.sd-run-tab-active {
   background: rgba(42,157,92,.14) !important;
   border-color: var(--green) !important;
+  border-width: 2px !important;
+  font-weight: 700;
 }
 
 .sd-run-tab-fail {
@@ -455,6 +457,8 @@
 .sd-run-tab-fail.sd-run-tab-active {
   background: rgba(227,6,19,.14) !important;
   border-color: var(--red) !important;
+  border-width: 2px !important;
+  font-weight: 700;
 }
 
 .sd-run-tab-icon {
@@ -468,6 +472,15 @@
 .sd-run-tab-label {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 11px;
+}
+
+.sd-run-tab-dur {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 10px;
+  opacity: 0.55;
+  padding-left: 3px;
+  border-left: 1px solid currentColor;
+  margin-left: 2px;
 }
 
 /* ── Outline badge ── */
